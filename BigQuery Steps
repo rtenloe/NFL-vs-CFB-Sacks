@@ -1,0 +1,6 @@
+The first step was cleaning and adding all the data that was required. 
+The NFL data was pulled from NFLverse-data from Github and cover from the 1999 season to the current 2024 season.
+The CFB data was pulled from NCAA archived statistics (https://web1.ncaa.org/stats/StatsSrv/rankings?doWhat=archive&sportCode=MFB) and date back to the 1999 season.
+Due to a difference in the way that data is handled on the website pre-2013, I decided to only use statistics from 2013-2023 since they are all in the same format and can easily be cleaned and formatted. 
+In the future, I may go back and create a Python script to clean and reformat the pre-2013 data so that I can have more data to study.
+
