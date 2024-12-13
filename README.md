@@ -29,6 +29,93 @@ Due to the fact that a full season in college is different from that of the NFL,
 - BigQuery
 ## Data Cleaning
 ### CFB Sheets
-Since the two datasets were in completely different formats, I knew that a lot of data manipulation would be needed. The CFB spreadsheets were in a pretty good state already since they were already arranged by season and they also contained my primary metric (sacks per game). The only cleaning that was needed for the CFB spreadsheets was deleting all the rows above the header and changing the names of the headers to something that was more SQL friendly. All of the header names were changed to lower case and a few of them were changed. Below I have a table showing the different column names that were used. The CFB spreadsheets were added to a dataset titled "CFB" in BigQuery in separate tables, each titled by whatever year they represent. These tables were then joined together using UNION ALL in BigQuery into a table titled, "FBS_Sacks". From this conjoined table, I cleaned the data again to make sure there were no obvious errors. For example, I used SELECT DISTINCT on the Pos (position) column to ensure that there were non-defensive positions listed. There was one player that was incorrectly listed as RB (running back), so I used UPDATE to change that entry to LB.
+Since the two datasets were in completely different formats, I knew that a lot of data manipulation would be needed. The CFB spreadsheets were in a pretty good state already since they were already arranged by season and they also contained my primary metric (sacks per game). The only cleaning that was needed for the CFB spreadsheets was deleting all the rows above the header and changing the names of the headers to something that was more SQL friendly. All of the header names were changed to lower case and a few of them were changed. Below I have a table showing the different column names that were used. The CFB spreadsheets were added to a dataset titled "CFB" in BigQuery in separate tables, each titled by whatever year they represent. These tables were then joined together using UNION ALL in BigQuery into a table titled, "FBS_Sacks".
 ### NFL Sheets
-The NFL spreadsheet was not nearly as simple as the CFB sheets, which were pretty much completely cleaned in Excel. The NFL sheet was almost entirely cleaned in BiqQuery. This sheet was added to a dataset in BigQuery titled, "NFL_Players" (I should have named it "NFL", but I named this dataset when I was first starting and was not sure what all I was going to be adding at the time).
+The NFL spreadsheet was not nearly as simple as the CFB sheets, which were pretty much completely cleaned in Excel. The NFL sheet was almost entirely cleaned in BiqQuery. The raw data sheet was added to a dataset in BigQuery titled, "NFL_Players.Defense" (I should have named it "NFL", but I named this dataset when I was first starting and was not sure what all I was going to be adding at the time). From there, the data was aggregated into one table titled, "NFL_Players.A".
+## SQL Queries
+```
+CREATE TABLE NFL_Players.A AS
+  SELECT player_id, player_display_name, COUNT(player_id) AS nfl_games, SUM(def_sacks) AS nfl_total_sacks
+  FROM NFL_Players.Defense
+  GROUP BY player_id, player_display_name
+  ORDER BY player_display_name ASC
+```
+First, Takes each entry specific to a player_id and counts it to give me the total number of games that player played in his career, then sums up each sack that player achieved in those games. Second, it creates a table, NFL_Players.A, to store the results.
+```
+ALTER TABLE NFL_Players.A
+ADD COLUMN nfl_sacks_per_game float64
+```
+Adds a column to the NFL table for sacks per game since this statistic was not included in the original NFL data.
+```
+UPDATE NFL_Players.A
+SET nfl_sacks_per_game = nfl_total_sacks / nfl_games
+WHERE true
+```
+Sets sacks per game as total sacks divided by total games played.
+```
+DELETE
+FROM NFL_Players.A
+WHERE nfl_games < 16
+```
+Removes all players from the NFL_Players.A table that have played less than 16 total games (one full season).
+```
+CREATE TABLE CFB.FBS_Sacks AS
+  SELECT * FROM CFB.2023
+  UNION ALL
+  SELECT * FROM CFB.2022
+  UNION ALL
+  SELECT * FROM CFB.2021
+  UNION ALL
+  SELECT * FROM CFB.2020
+  UNION ALL
+  SELECT * FROM CFB.2019
+  UNION ALL
+  SELECT * FROM CFB.2018
+  UNION ALL
+  SELECT * FROM CFB.2017
+  UNION ALL
+  SELECT * FROM CFB.2016
+  UNION ALL
+  SELECT * FROM CFB.2015
+  UNION ALL
+  SELECT * FROM CFB.2014
+  ORDER BY player_display_name ASC
+```
+Creates the CFB.FBS_Sacks table by combining all the individual CFB tables.
+```
+SELECT DISTINCT POS
+FROM CFB.FBS_Sacks
+```
+Shows each position that is in the table, CFB.FBS_Sacks. All returns were defensive positions except one which was RB.
+```
+SELECT *
+FROM CFB.FBS_Sacks
+WHERE Pos = 'RB'
+```
+Shows which players have their position listed as RB. Returned one player named "Charles Wright".
+```
+UPDATE CFB.FBS_Sacks
+SET Pos = "LB"
+WHERE player_display_name = "Charles Wright"
+```
+Changes Charles Wright's position from RB to LB.
+```
+CREATE TABLE CFB.C AS
+  SELECT *
+  FROM 
+    (SELECT
+    player_display_name, Pos, SUM(cfb_games) AS cfb_games, SUM(solo_sack) AS cfb_solo_sacks, SUM(asst_sack) AS cfb_asst_sacks, SUM(cfb_total_sacks) AS cfb_total_sacks, AVG(cfb_sacks_per_game) AS cfb_sacks_per_game
+    FROM CFB.FBS_Sacks
+    GROUP BY player_display_name, Pos) AS ds
+  WHERE ds.cfb_games >= 12
+  ORDER BY player_display_name ASC
+```
+Takes the table, CFB.FBS_Sacks, and adds up each statistic for each player over multiple seasons to get career numbers. Then it returns only those players that have played at least a total of 12 games over their college career. Team is not included in this query since there are some players that have played for mulitple teams in college. This data is then stored in a new table titled, "CFB.C".
+```
+SELECT C.player_display_name, C.pos, cfb_games, cfb_total_sacks, cfb_sacks_per_game, nfl_games, nfl_total_sacks, nfl_sacks_per_game
+FROM CFB.C
+FULL OUTER JOIN NFL_Players.A
+ON B.player_display_name = A.player_display_name
+WHERE cfb_sacks_per_game is not null AND nfl_sacks_per_game is NOT NULL
+ORDER BY nfl_total_sacks DESC
+```
