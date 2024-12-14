@@ -121,3 +121,13 @@ ON B.player_display_name = A.player_display_name
 WHERE cfb_sacks_per_game is not null AND nfl_sacks_per_game is NOT NULL
 ORDER BY nfl_total_sacks DESC
 ```
+```
+SELECT *
+FROM
+  (SELECT player_id, MAX(nfl_games) AS most_pos_games, SUM(nfl_games) AS total_games
+  FROM NFL_Players.D
+  GROUP BY player_id
+  HAVING COUNT(DISTINCT(pos)) > 1
+  ORDER BY player_id DESC) AS ds
+WHERE ds.total_games >= 16
+```
