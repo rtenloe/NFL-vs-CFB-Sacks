@@ -30,10 +30,40 @@ Due to the fact that a full season in college is different from that of the NFL,
 ## Data Cleaning
 ### CFB Sheets
 Since the two datasets were in completely different formats, I knew that a lot of data manipulation would be needed. The CFB spreadsheets were in a pretty good state already since they were already arranged by season and they also contained my primary metric (sacks per game). The only cleaning that was needed for the CFB spreadsheets was deleting all the rows above the header and changing the names of the headers to something that was more SQL friendly. All of the header names were changed to lower case and a few of them were changed. Below I have a table showing the different column names that were used. The CFB spreadsheets were added to a dataset titled "CFB" in BigQuery in separate tables, each titled by whatever year they represent. These tables were then joined together using UNION ALL in BigQuery into a table titled, "FBS_Sacks".
-
-As a side objective to this project, I wanted to see if there was more correlation when you broke it down by position. Therefore, I needed to do a little more work on the positions. I used SQL queries to see if there was more than one position listed for a player across different seasons. (Quick side bar: position naming conventions are not always standardized in the sense that a player may play multiple positions during a season. However, for this study I am assigning a player either LB, DB, DT, or DE depending on which one fits best). In total there were 35 players that had multiple positions listed for them. I took each and these and put them in a word document (Word document in repository) listing all the positions that had been assigned to them. Most of these only consist of two positions. I then went through each of these and decided whcih of the positions listed best fit that player. I then replace these positions in SQL.
 ### NFL Sheets
 The NFL spreadsheet was not nearly as simple as the CFB sheets, which were pretty much completely cleaned in Excel. The NFL sheet was almost entirely cleaned in BiqQuery. The raw data sheet was added to a dataset in BigQuery titled, "NFL_Players.Defense" (I should have named it "NFL", but I named this dataset when I was first starting and was not sure what all I was going to be adding at the time). From there, the data was aggregated into one table titled, "NFL_Players.A".
+## Results
+Trend Lines Model
+
+A linear trend model is computed for sum of College Sacks Per Game given sum of Nfl Sacks Per Game.  The model may be significant at p <= 0.05.
+
+|             Model formula:         | ( NFL Sacks Per Game + intercept ) |
+| ---------------------------------- | ---------------------------------- |
+|   Number of modeled observations:  |	               233                |
+|     Model degrees of freedom:      |	                2                 |
+|  Residual degrees of freedom (DF): |	               231                |
+|       SSE (sum squared error):     |	             6.4515               |
+|     MSE (mean squared error):      |	            0.0279286             |
+|             R-Squared:             |            	0.126125              |
+|           Standard error:          |	            0.167118              |
+|      p-value (significance):       |	            < 0.0001              |
+
+Individual trend lines:
+
+|Row	Column	p-value	DF	Term	Value	StdErr	t-value	p-value
+|Cfb Sacks Per Game	Nfl Sacks Per Game	< 0.0001	231	Nfl Sacks Per Game	0.345861	0.059899	5.77407	< 0.0001
+|intercept	0.569627	0.0189326	30.0871	< 0.0001
+
+## Possible Problem Areas
+There are some parts of this project that create some problems and can add to the variance in the data. In this section, I will go over some shortcomings of this study and how it could possibly be improved in the future.
+### Lack of Data Prior to 2013
+Due to the difference in formatting in the college data prior to 2013, I decided to only use data since 2013 to keep this project simpler since this is my first project. This lowers the sample size which increases the margin of error.
+### College Data is Limited
+The data I used for the college statistics did not list every defensive player in the FBS, but rather it only included players that had a certain prerequisite sacks per game. This also decreases the sample size of data and can skew the data since there are likely some players that had fewer sacks per game in college and weren't represented in the data, but were more productive in the NFL.
+### Data Entry Errors
+Due to the large size of the datasets, it is possible that there are some data entry errors that can lead to some statistics being incorrect or misleading.
+### Different Teams/Schemes/Injuries, Etc.
+A player that played on a bad team in college might have better stats in the NFL if they end up on a better team and vice versa. This is an extra variable that could play a part in a player having better sack production in the NFL compared to college (or vice versa). In general, there are quite a few variables since football is a team game. Players get injured which can lead to a dropoff in production. Maybe they switch to a position that better suits them in the NFL. Here's an example: Micah Parsons primarily played LB in college and did not have very many sacks (0.38 sacks per game), however, once he got to the NFL he was moved to DE and has had a lot more success (0.82 sacks per game). If he had played DE in college, it is possible that those numbers would be a lot closer to one another.
 ## SQL Queries
 ```
 CREATE TABLE NFL_Players.A AS
